@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>李向阳的空间 | 留言板 · 弹幕星河</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none; /* 避免拖动干扰，不影响输入 */
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Poppins', 'Noto Sans', system-ui, -apple-system, 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+            background: #0a0f1e;
+            transition: background-image 0.6s ease-in-out;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+        }
+
+        /* 动态高清背景 (全屏覆盖) */
+        .bg-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center 30%;
+            background-repeat: no-repeat;
+            transition: background-image 0.8s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            z-index: -2;
+            filter: brightness(0.85) contrast(1.05);
+        }
+        /* 半透明遮罩增加文字可读性 */
+        .bg-layer::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 15, 30, 0.55);
+            backdrop-filter: blur(2px);
+            pointer-events: none;
+        }
+
+        /* 主卡片容器 */
+        .main-container {
+            width: 100%;
+            max-width: 1350px;
+            height: 85vh;
+            min-height: 620px;
+            background: rgba(22, 28, 40, 0.65);
+            backdrop-filter: blur(14px);
+            border-radius: 2.5rem;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.2s;
+        }
+
+        /* 顶部导航栏 */
+        .top-bar {
+            padding: 1rem 2rem;
+            background: rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+        }
+
+        .logo-area h1 {
+            font-size: 1.7rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #fff8e7, #c0e0ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .logo-area p {
+            font-size: 0.7rem;
+            color: #ccddee;
+            opacity: 0.8;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: rgba(20, 30, 45, 0.8);
+            border: none;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: #f0f3fa;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-primary {
+            background: #3b4b6e;
+            border-color: #8ab3ff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5f7bb3;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(0,0,0,0.3);
+        }
+        .btn-warning {
+            background: #8b5e3c;
+            border-color: #ffbc6e;
+        }
+        .btn-warning:hover {
+            background: #b47c44;
+            transform: translateY(-2px);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #ccd9ff;
+        }
+        .btn-outline:hover {
+            background: rgba(255,255,255,0.15);
+            transform: scale(0.97);
+        }
+
+        /* 双面板切换 */
+        .panels-wrapper {
+            flex: 1;
+            position: relative;
+            overflow-y: auto;
+            padding: 20px 28px;
+        }
+
+        .panel {
+            transition: opacity 0.25s ease, visibility 0.2s;
+            width: 100%;
+        }
+        .panel.hidden {
+            display: none;
+        }
+
+        /* 留言卡片区域 */
+        .message-board {
+            background: rgba(10, 15, 26, 0.6);
+            border-radius: 2rem;
+            padding: 1.2rem;
+            backdrop-filter: blur(5px);
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,240,0.15);
+        }
+
+        .board-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding-bottom: 12px;
+            border-bottom: 2px solid rgba(255,215,150,0.5);
+            margin-bottom: 16px;
+        }
+        .board-header h3 {
+            font-size: 1.4rem;
+            font-weight: 500;
+            color: #FFE5B4;
+        }
+        .msg-count {
+            font-size: 0.75rem;
+            background: #2a2f3f;
+            padding: 4px 12px;
+            border-radius: 40px;
+        }
+
+        .messages-list {
+            max-height: 380px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 6px;
+        }
+        .message-item {
+            background: rgba(25, 35, 55, 0.7);
+            border-radius: 1.2rem;
+            padding: 12px 18px;
+            backdrop-filter: blur(4px);
+            border-left: 4px solid #f3b562;
+            transition: 0.1s;
+        }
+        .msg-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #bdd4ff;
+            margin-bottom: 8px;
+        }
+        .msg-nick {
+            font-weight: bold;
+            color: #ffdb9f;
+        }
+        .msg-time {
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+        .msg-content {
+            color: #f0f3fc;
+            word-break: break-word;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        /* 输入区域 */
+        .input-area {
+            background: rgba(0, 0, 0, 0.45);
+            border-radius: 2rem;
+            padding: 16px 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .input-group {
+            flex: 3;
+            min-width: 180px;
+        }
+        .input-group label {
+            font-size: 0.7rem;
+            color: #cddcff;
+            display: block;
+            margin-bottom: 4px;
+        }
+        textarea, input {
+            width: 100%;
+            background: #1e293b;
+            border: 1px solid #4b5a7a;
+            border-radius: 28px;
+            padding: 10px 18px;
+            color: white;
+            font-size: 0.9rem;
+            resize: vertical;
+            font-family: inherit;
+            transition: 0.2s;
+        }
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: #ffbc6e;
+            box-shadow: 0 0 6px #ffb347;
+        }
+        .send-btn {
+            background: #f0a34b;
+            border: none;
+            border-radius: 40px;
+            padding: 0 28px;
+            height: 48px;
+            font-weight: bold;
+            color: #1a1f2c;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 1rem;
+        }
+        .send-btn:hover {
+            background: #ffbc6e;
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        /* 密码 & 昵称区域 */
+        .settings-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 28px;
+            padding: 12px 18px;
+            align-items: center;
+        }
+        .nick-set, .password-set {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex: 1;
+            flex-wrap: wrap;
+        }
+        .nick-set input, .password-set input {
+            width: auto;
+            flex: 2;
+            min-width: 130px;
+            background: #0f172a;
+        }
+        .badge {
+            font-size: 0.7rem;
+            background: #1e2a3a;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .private-badge {
+            background: #7c3a5e;
+            color: #ffe0f0;
+        }
+
+        /* 弹幕层 (pointer-events穿透) */
+        .danmaku-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 999;
+        }
+        .danmaku {
+            position: absolute;
+            white-space: nowrap;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-shadow: 0 0 5px black, 0 0 3px rgba(0,0,0,0.7);
+            will-change: transform;
+            pointer-events: none;
+            animation: fly linear forwards;
+            opacity: 0.9;
+            font-family: 'Segoe UI', system-ui;
+        }
+        @keyframes fly {
+            0% {
+                transform: translateX(100vw);
+            }
+            100% {
+                transform: translateX(-350px);
+            }
+        }
+        /* 滚动条 */
+        .messages-list::-webkit-scrollbar {
+            width: 5px;
+        }
+        .messages-list::-webkit-scrollbar-track {
+            background: #1e293b;
+            border-radius: 10px;
+        }
+        .messages-list::-webkit-scrollbar-thumb {
+            background: #f3b562;
+            border-radius: 10px;
+        }
+        .footer-tip {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #bbc6e0;
+            margin-top: 10px;
+        }
+        @media (max-width: 700px) {
+            .main-container { height: 92vh; }
+            .panels-wrapper { padding: 16px; }
+            .input-area { flex-direction: column; }
+            .send-btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="bg-layer" id="dynamicBg"></div>
+<div class="danmaku-layer" id="danmakuLayer"></div>
+
+<div class="main-container">
+    <div class="top-bar">
+        <div class="logo-area">
+            <h1>🏔️ 李向阳的空间</h1>
+            <p>极光森林 · 匿名星河</p>
+        </div>
+        <div class="action-buttons">
+            <button class="btn btn-outline" id="randomBgBtn">✨ 换景·随机</button>
+            <button class="btn btn-primary" id="enterPrivateBtn">🔐 进入私人空间</button>
+        </div>
+    </div>
+
+    <!-- 全局设置栏：昵称+约定密码 -->
+    <div class="settings-row" style="margin: 0 20px; margin-top: 10px;">
+        <div class="nick-set">
+            <span class="badge">✏️ 我的昵称</span>
+            <input type="text" id="nicknameInput" placeholder="取个炫酷昵称~" maxlength="24">
+            <button class="btn" id="saveNickBtn">保存昵称</button>
+            <span id="nickStatus" class="badge" style="background:#2d3a4e;">未设置</span>
+        </div>
+        <div class="password-set">
+            <span class="badge">🤝 约定密码</span>
+            <input type="password" id="customPasswordInput" placeholder="双方统一密码" maxlength="20">
+            <button class="btn" id="setPasswordBtn">设置/修改</button>
+            <span id="pwdStatus" class="badge" style="background:#2d3a4e;">未设定</span>
+        </div>
+    </div>
+
+    <div class="panels-wrapper">
+        <!-- 公共留言板大厅 -->
+        <div id="publicPanel" class="panel">
+            <div class="message-board">
+                <div class="board-header">
+                    <h3>🌍 公共留言大厅 · 星河回响</h3>
+                    <span class="msg-count" id="publicMsgCount">0条留言</span>
+                </div>
+                <div class="messages-list" id="publicMessagesList">
+                    <div style="text-align:center; color:#aaa;">✨ 加载星河寄语中...</div>
+                </div>
+            </div>
+            <div class="input-area">
+                <div class="input-group" style="flex:4;">
+                    <label>📢 说些什么 (弹幕会穿梭银河~)</label>
+                    <textarea rows="2" id="publicMessageInput" placeholder="留下你的足迹..."></textarea>
+                </div>
+                <button class="send-btn" id="sendPublicBtn">✈️ 发布留言 + 弹幕</button>
+            </div>
+            <div class="footer-tip">💡 发布留言将自动生成彩色弹幕 | 昵称持久化保存</div>
+        </div>
+
+        <!-- 私人留言板 (独立、仅会话) -->
+        <div id="privatePanel" class="panel hidden">
+            <div class="message-board">
+                <div class="board-header">
+                    <h3>🔒 私人约定空间 · 密友絮语</h3>
+                    <span class="msg-count" id="privateMsgCount">0条私语</span>
+                </div>
+                <div class="messages-list" id="privateMessagesList">
+                    <div style="text-align:center; color:#c9a5ff;">🌸 这是你们的秘密基地，留言仅本次可见</div>
+                </div>
+            </div>
+            <div class="input-area">
+                <div class="input-group" style="flex:4;">
+                    <label>🤫 悄悄话 (仅彼此可见，不保存记录)</label>
+                    <textarea rows="2" id="privateMessageInput" placeholder="写下悄悄话..."></textarea>
+                </div>
+                <button class="send-btn" id="sendPrivateBtn">💌 发送私语</button>
+                <button class="btn btn-warning" id="exitPrivateBtn">🚪 退出私人空间</button>
+            </div>
+            <div class="footer-tip">✨ 私人留言不存储，刷新即消失 | 使用约定密码进入</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ---------- 核心数据结构 ----------
+    let publicMessages = [];      // {nickname, time, content}
+    let privateMessages = [];     // 仅当前会话 (进入私人空间时重置)
+
+    // 全局状态
+    let currentNickname = "";            // 当前有效昵称 (本地存储)
+    let secretPassword = "";             // 约定的密码 (本地存储)
+    let isInPrivateSpace = false;         // 当前是否处于私人模式 (控制面板和弹幕)
+
+    // DOM 元素
+    const publicPanelDiv = document.getElementById('publicPanel');
+    const privatePanelDiv = document.getElementById('privatePanel');
+    const publicMsgList = document.getElementById('publicMessagesList');
+    const privateMsgList = document.getElementById('privateMessagesList');
+    const publicMsgCountSpan = document.getElementById('publicMsgCount');
+    const privateMsgCountSpan = document.getElementById('privateMsgCount');
+    const publicInput = document.getElementById('publicMessageInput');
+    const privateInput = document.getElementById('privateMessageInput');
+    const sendPublicBtn = document.getElementById('sendPublicBtn');
+    const sendPrivateBtn = document.getElementById('sendPrivateBtn');
+    const enterPrivateBtn = document.getElementById('enterPrivateBtn');
+    const exitPrivateBtn = document.getElementById('exitPrivateBtn');
+    const nicknameInput = document.getElementById('nicknameInput');
+    const saveNickBtn = document.getElementById('saveNickBtn');
+    const nickStatusSpan = document.getElementById('nickStatus');
+    const customPwdInput = document.getElementById('customPasswordInput');
+    const setPasswordBtn = document.getElementById('setPasswordBtn');
+    const pwdStatusSpan = document.getElementById('pwdStatus');
+    const randomBgBtn = document.getElementById('randomBgBtn');
+    const dynamicBg = document.getElementById('dynamicBg');
+
+    // ---------- 高清背景图库 (雪山, 森林, 银河, 月球) ----------
+    const bgImages = [
+        'https://images.pexels.com/photos/2506991/pexels-photo-2506991.jpeg?auto=compress&cs=tinysrgb&w=1600', // 雪山
+        'https://images.pexels.com/photos/957024/forest-trees-pine-nature-957024.jpeg?auto=compress&cs=tinysrgb&w=1600', // 森林
+        'https://images.pexels.com/photos/998641/pexels-photo-998641.jpeg?auto=compress&cs=tinysrgb&w=1600', // 银河
+        'https://images.pexels.com/photos/47367/moon-full-moon-astronomy-lunar-moon-47367.jpeg?auto=compress&cs=tinysrgb&w=1600'  // 月球
+    ];
+    let currentBgIndex = -1;
+    function setRandomBackground() {
+        let newIndex = Math.floor(Math.random() * bgImages.length);
+        if (newIndex === currentBgIndex && bgImages.length > 1) newIndex = (newIndex+1)%bgImages.length;
+        currentBgIndex = newIndex;
+        dynamicBg.style.backgroundImage = `url(${bgImages[currentBgIndex]})`;
+    }
+    randomBgBtn.addEventListener('click', setRandomBackground);
+    setRandomBackground(); // 首次随机
+
+    // ---------- 辅助函数: 格式化时间 ----------
+    function getCurrentTime() {
+        const now = new Date();
+        return `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+    }
+
+    // 转义HTML
+    function escapeHtml(str) {
+        if(!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            return m;
+        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+            return c;
+        });
+    }
+
+    // 渲染公共留言板
+    function renderPublicBoard() {
+        if (!publicMessages.length) {
+            publicMsgList.innerHTML = '<div style="text-align:center; color:#b9c8ff;">✨ 暂无留言，做第一个仰望星河的人 ✨</div>';
+            publicMsgCountSpan.innerText = '0条留言';
+            return;
+        }
+        let html = '';
+        publicMessages.slice().reverse().forEach(msg => {   // 最新的在上方展示更好看
+            html += `
+                <div class="message-item">
+                    <div class="msg-header">
+                        <span class="msg-nick">${escapeHtml(msg.nickname) || '匿名者'}</span>
+                        <span class="msg-time">${escapeHtml(msg.time)}</span>
+                    </div>
+                    <div class="msg-content">${escapeHtml(msg.content)}</div>
+                </div>
+            `;
+        });
+        publicMsgList.innerHTML = html;
+        publicMsgCountSpan.innerText = `${publicMessages.length}条留言`;
+        // 自动滚动到底部 (最新展示在上方其实更符合习惯，但我们为了自动滚动至最新添加的消息，将scrollTop设定为0显示最新的消息，因为最新消息添加后展示在列表顶部)
+        // 留言列表顺序反转了最新在上方，所以用户希望滚动到最新内容即滚动到顶部即可展示最新留言。
+        if(publicMsgList) publicMsgList.scrollTop = 0;
+    }
+
+    // 存储公共留言至localStorage
+    function savePublicToLocal() {
+        localStorage.setItem('li_xy_public_msgs', JSON.stringify(publicMessages));
+    }
+
+    // 加载公共留言
+    function loadPublicMessages() {
+        const stored = localStorage.getItem('li_xy_public_msgs');
+        if(stored) {
+            try {
+                publicMessages = JSON.parse(stored);
+                if(!Array.isArray(publicMessages)) publicMessages = [];
+            } catch(e) { publicMessages = []; }
+        } else {
+            publicMessages = [];
+        }
+        renderPublicBoard();
+    }
+
+    // 添加公共留言 + 弹幕触发
+    function addPublicMessage(content, nickname) {
+        if(!nickname || nickname.trim() === "") {
+            alert("⚠️ 请先设置昵称才能留言~");
+            return false;
+        }
+        if(!content || content.trim() === "") {
+            alert("📝 留言内容不能为空~");
+            return false;
+        }
+        const newMsg = {
+            nickname: nickname.trim(),
+            time: getCurrentTime(),
+            content: content.trim()
+        };
+        publicMessages.unshift(newMsg); // 最新在上方
+        savePublicToLocal();
+        renderPublicBoard();
+
+        // 发布后触发大厅弹幕 (仅在公共模式下并且弹幕不依赖视图，但因为弹幕层总是存在，且只在公共大厅才应该显示弹幕)
+        // 如果当前处于私人空间，依旧不应发送弹幕（逻辑隔离）用户无法在私人空间发布公共留言，因为公共面板隐藏，但以防万一加判断
+        if(!isInPrivateSpace) {
+            generateDanmaku(content.trim(), nickname.trim());
+        }
+        return true;
+    }
+
+    // ---------- 弹幕系统 (完全独立, 不保存) ----------
+    function generateDanmaku(text, nickname) {
+        const danmakuLayer = document.getElementById('danmakuLayer');
+        const danmakuDiv = document.createElement('div');
+        danmakuDiv.className = 'danmaku';
+        // 随机字体颜色 (明亮色系)
+        const hue = Math.floor(Math.random() * 360);
+        const sat = 65 + Math.floor(Math.random() * 30);
+        const light = 55 + Math.floor(Math.random() * 25);
+        danmakuDiv.style.color = `hsl(${hue}, ${sat}%, ${light}%)`;
+        danmakuDiv.style.textShadow = '0 0 4px black';
+        // 随机垂直位置 (10% ~ 85%)
+        const randomTop = 10 + Math.random() * 75;
+        danmakuDiv.style.top = `${randomTop}%`;
+        // 随机速度: 持续时间 6s ~ 14s
+        const duration = 6 + Math.random() * 10;
+        danmakuDiv.style.animationDuration = `${duration}s`;
+        // 内容格式: 昵称: 留言内容
+        const showText = `${escapeHtml(nickname)}: ${escapeHtml(text)}`;
+        danmakuDiv.innerText = showText;
+        danmakuDiv.style.fontSize = `${1 + Math.random() * 0.6}rem`;
+        danmakuLayer.appendChild(danmakuDiv);
+        // 动画结束后移除DOM释放内存
+        danmakuDiv.addEventListener('animationend', () => {
+            if(danmakuDiv && danmakuDiv.remove) danmakuDiv.remove();
+        });
+        // 如果超出3秒还没移除（保险）
+        setTimeout(() => {
+            if(danmakuDiv && danmakuDiv.remove) danmakuDiv.remove();
+        }, duration * 1000 + 500);
+    }
+
+    // 私人留言板渲染 (仅会话)
+    function renderPrivateBoard() {
+        if (!privateMessages.length) {
+            privateMsgList.innerHTML = '<div style="text-align:center; color:#d7b5ff;">🔮 暂无私密留言，说点悄悄话吧~</div>';
+            privateMsgCountSpan.innerText = '0条私语';
+            return;
+        }
+        let html = '';
+        privateMessages.slice().reverse().forEach(msg => {
+            html += `
+                <div class="message-item" style="border-left-color:#c97eff;">
+                    <div class="msg-header">
+                        <span class="msg-nick">💜 ${escapeHtml(msg.nickname)}</span>
+                        <span class="msg-time">${escapeHtml(msg.time)}</span>
+                    </div>
+                    <div class="msg-content">${escapeHtml(msg.content)}</div>
+                </div>
+            `;
+        });
+        privateMsgList.innerHTML = html;
+        privateMsgCountSpan.innerText = `${privateMessages.length}条私语`;
+        if(privateMsgList) privateMsgList.scrollTop = 0;
+    }
+
+    // 添加私人留言 (不做存储)
+    function addPrivateMessage(content, nickname) {
+        if(!nickname || nickname.trim() === "") {
+            alert("⚠️ 请先设置昵称再发送密语~");
+            return false;
+        }
+        if(!content || content.trim() === "") {
+            alert("💬 私密内容不能为空~");
+            return false;
+        }
+        const newMsg = {
+            nickname: nickname.trim(),
+            time: getCurrentTime(),
+            content: content.trim()
+        };
+        privateMessages.unshift(newMsg);
+        renderPrivateBoard();
+        return true;
+    }
+
+    // 进入私人空间验证
+    function enterPrivateSpace() {
+        if(!secretPassword || secretPassword.trim() === "") {
+            alert("🔐 请先在上方「约定密码」区域设置一个双方共知的密码！");
+            return;
+        }
+        const pwd = prompt("🔒 进入私人空间，请输入约定密码:");
+        if(pwd === null) return;
+        if(pwd === secretPassword) {
+            // 切换界面
+            isInPrivateSpace = true;
+            publicPanelDiv.classList.add('hidden');
+            privatePanelDiv.classList.remove('hidden');
+            // 重置私人留言 (全新会话)
+            privateMessages = [];
+            renderPrivateBoard();
+            // 清除弹幕层？不生成弹幕但无需清除现有弹幕，只是新弹幕不会从私人空间产生(发布公共不可见)
+            // 额外干净提示
+        } else {
+            alert("❌ 密码错误，无法进入私人空间！");
+        }
+    }
+
+    function exitPrivateSpace() {
+        isInPrivateSpace = false;
+        publicPanelDiv.classList.remove('hidden');
+        privatePanelDiv.classList.add('hidden');
+        // 私人留言不清除全局数组，但下次进入时会重置，其实没关系
+        // 切换回公共板时刷新公共列表（确保最新）
+        renderPublicBoard();
+    }
+
+    // 加载本地保存的昵称&密码
+    function loadLocalSettings() {
+        const savedNick = localStorage.getItem('li_xy_nickname');
+        if(savedNick) {
+            currentNickname = savedNick;
+            nicknameInput.value = savedNick;
+            nickStatusSpan.innerText = `已设: ${escapeHtml(savedNick.slice(0,12))}`;
+            nickStatusSpan.style.background = '#3a6741';
+        } else {
+            currentNickname = "";
+            nickStatusSpan.innerText = '未设置昵称';
+            nickStatusSpan.style.background = '#2d3a4e';
+        }
+        const savedPwd = localStorage.getItem('li_xy_secret_password');
+        if(savedPwd) {
+            secretPassword = savedPwd;
+            pwdStatusSpan.innerText = '密码已设定 ✓';
+            pwdStatusSpan.style.background = '#3a6741';
+            customPwdInput.value = '';
+        } else {
+            secretPassword = "";
+            pwdStatusSpan.innerText = '未设定密码';
+        }
+    }
+
+    // 保存昵称
+    function setNickname() {
+        let newNick = nicknameInput.value.trim();
+        if(newNick === "") {
+            alert("昵称不能为空，请输入有趣的称呼~");
+            return;
+        }
+        if(newNick.length > 24) newNick = newNick.slice(0,24);
+        currentNickname = newNick;
+        localStorage.setItem('li_xy_nickname', currentNickname);
+        nickStatusSpan.innerText = `已设: ${escapeHtml(currentNickname.slice(0,12))}`;
+        nickStatusSpan.style.background = '#3a6741';
+        alert(`✅ 昵称已更新为: ${currentNickname}`);
+    }
+
+    // 设置约定密码
+    function setPassword() {
+        let newPwd = customPwdInput.value.trim();
+        if(newPwd === "") {
+            alert("请输入约定密码 (双方协商一致)");
+            return;
+        }
+        if(newPwd.length > 20) newPwd = newPwd.slice(0,20);
+        secretPassword = newPwd;
+        localStorage.setItem('li_xy_secret_password', secretPassword);
+        pwdStatusSpan.innerText = '密码已设定 ✓';
+        pwdStatusSpan.style.background = '#3a6741';
+        customPwdInput.value = '';
+        alert("🔒 约定密码已保存！对方使用相同密码即可进入私人空间。");
+    }
+
+    // 发布公共留言回调
+    function onSendPublic() {
+        const content = publicInput.value.trim();
+        if(!currentNickname) {
+            alert("请先在上方「我的昵称」处设置并保存昵称！");
+            return;
+        }
+        if(content === "") {
+            alert("内容不能为空~");
+            return;
+        }
+        addPublicMessage(content, currentNickname);
+        publicInput.value = "";
+        publicInput.focus();
+    }
+
+    function onSendPrivate() {
+        if(!currentNickname) {
+            alert("请先设置昵称再发送私密消息~");
+            return;
+        }
+        const content = privateInput.value.trim();
+        if(content === "") {
+            alert("悄悄话内容不能为空~");
+            return;
+        }
+        addPrivateMessage(content, currentNickname);
+        privateInput.value = "";
+        privateInput.focus();
+    }
+
+    // 事件绑定
+    sendPublicBtn.addEventListener('click', onSendPublic);
+    sendPrivateBtn.addEventListener('click', onSendPrivate);
+    enterPrivateBtn.addEventListener('click', enterPrivateSpace);
+    exitPrivateBtn.addEventListener('click', exitPrivateSpace);
+    saveNickBtn.addEventListener('click', setNickname);
+    setPasswordBtn.addEventListener('click', setPassword);
+    // 输入框回车快捷发送（可选）
+    publicInput.addEventListener('keydown', (e) => { if(e.ctrlKey && e.key === 'Enter') onSendPublic(); });
+    privateInput.addEventListener('keydown', (e) => { if(e.ctrlKey && e.key === 'Enter') onSendPrivate(); });
+
+    // 初始化
+    loadPublicMessages();
+    loadLocalSettings();
+    // 默认显示公共面板，私人隐藏
+    isInPrivateSpace = false;
+    publicPanelDiv.classList.remove('hidden');
+    privatePanelDiv.classList.add('hidden');
+    renderPublicBoard();
+</script>
+</body>
+</html>
